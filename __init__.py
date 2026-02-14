@@ -1,8 +1,13 @@
 from .core import logger
 from .server import *
 from .general import *
+from comfy_api.latest import ComfyExtension, io
 
-NODE_CLASS_MAPPINGS = {}
+class CrystoolsMonitor(ComfyExtension):
+    async def get_node_list(self) -> list[type[io.ComfyNode]]:
+        return []
+
+async def comfy_entrypoint() -> CrystoolsMonitor:
+    return CrystoolsMonitor()
 
 WEB_DIRECTORY = "./web"
-__all__ = ['NODE_CLASS_MAPPINGS', 'WEB_DIRECTORY']
