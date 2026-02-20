@@ -57,6 +57,7 @@
       width: 100%;
       transform: scaleX(0);
       transform-origin: left center;
+      will-change: transform;
     }
 
     .crysmonitor-label {
@@ -154,6 +155,7 @@
     width: 100%;
     transform: scaleX(0);
     transform-origin: left center;
+    will-change: transform;
   }
 
   .crysmonitor-label {

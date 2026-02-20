@@ -5,6 +5,12 @@ export class MonitorUI extends ProgressBarUIBase {
   lastMonitor = 1; // just for order on monitors section
   styleSheet: HTMLStyleElement;
   maxVRAMUsed: Record<number, number> = {}; // Add this to track max VRAM per GPU
+  private _disableSmooth = false;
+  private _numbersOnly = false;
+  private _numbersOnlySheet: HTMLStyleElement;
+  private _disableSmoothSheet: HTMLStyleElement;
+  private _pendingData: TStatsData | null = null;
+  private _rafId = 0;
 
   constructor(
     public override rootElement: HTMLElement,
@@ -15,11 +21,21 @@ export class MonitorUI extends ProgressBarUIBase {
     private monitorVRAMSettings: TMonitorSettings[],
     private monitorTemperatureSettings: TMonitorSettings[],
     private currentRate: number,
+    disableSmooth: boolean = false,
+    numbersOnly: boolean = false,
   ) {
     super('crysmonitor-monitors-root', rootElement);
+    this._disableSmooth = disableSmooth;
+    this._numbersOnly = numbersOnly;
+    this._numbersOnlySheet = createStyleSheet('crysmonitor-numbers-only');
+    this._disableSmoothSheet = createStyleSheet('crysmonitor-disable-smooth');
     this.createDOM();
 
     this.styleSheet = createStyleSheet('crysmonitor-monitors-size');
+
+    // Apply initial states
+    this._applyNumbersOnlyCSS();
+    this._applyDisableSmoothCSS();
   }
 
   createDOM = (): void => {
@@ -66,6 +82,26 @@ export class MonitorUI extends ProgressBarUIBase {
   };
 
   updateDisplay = (data: TStatsData): void => {
+    // Store latest data; if multiple messages arrive before next frame, only the last one is rendered
+    this._pendingData = data;
+    if (!this._rafId) {
+      this._rafId = requestAnimationFrame(this._flushDisplay);
+    }
+  };
+
+  private _flushDisplay = (): void => {
+    this._rafId = 0;
+    const data = this._pendingData;
+    if (!data) return;
+    this._pendingData = null;
+
+    // Skip all DOM writes when the tab is not visible
+    if (document.hidden) return;
+
+    this._doUpdateDisplay(data);
+  };
+
+  private _doUpdateDisplay = (data: TStatsData): void => {
     this.updateMonitor(this.monitorCPUElement, data.cpu_utilization);
     this.updateMonitor(this.monitorRAMElement, data.ram_used_percent, data.ram_used, data.ram_total);
     this.updateMonitor(this.monitorHDDElement, data.hdd_used_percent, data.hdd_used, data.hdd_total);
@@ -112,7 +148,7 @@ export class MonitorUI extends ProgressBarUIBase {
         }
 
         this.updateMonitor(monitorSettings, gpu.gpu_temperature);
-        if (monitorSettings.cssColorFinal && monitorSettings.htmlMonitorSliderRef) {
+        if (!this._numbersOnly && monitorSettings.cssColorFinal && monitorSettings.htmlMonitorSliderRef) {
           const tempFloored = Math.floor(gpu.gpu_temperature);
           if (monitorSettings._lastTempColor !== tempFloored) {
             monitorSettings._lastTempColor = tempFloored;
@@ -177,7 +213,11 @@ export class MonitorUI extends ProgressBarUIBase {
       monitorSettings.htmlMonitorRef.title = title;
     }
     monitorSettings.htmlMonitorLabelRef.textContent = `${flooredPercent}${monitorSettings.symbol}`;
-    monitorSettings.htmlMonitorSliderRef.style.transform = `scaleX(${Math.min(flooredPercent / 100, 1).toFixed(4)})`;
+
+    // Skip slider transform when in numbers-only mode — no compositor work for hidden elements
+    if (!this._numbersOnly) {
+      monitorSettings.htmlMonitorSliderRef.style.transform = `scaleX(${Math.min(flooredPercent / 100, 1).toFixed(4)})`;
+    }
   };
 
   updateAllAnimationDuration = (value: number): void => {
@@ -201,7 +241,43 @@ export class MonitorUI extends ProgressBarUIBase {
       return;
     }
 
-    slider.style.transition = `transform ${value.toFixed(1)}s linear`;
+    // When smooth is disabled, the stylesheet handles transition:none globally.
+    // Only set inline transition when smooth is enabled.
+    if (!this._disableSmooth) {
+      slider.style.transition = `transform ${value.toFixed(1)}s linear`;
+    } else {
+      slider.style.transition = '';
+    }
+  };
+
+  setDisableSmooth = (value: boolean): void => {
+    this._disableSmooth = value;
+    this._applyDisableSmoothCSS();
+    this.updateAllAnimationDuration(this.currentRate);
+  };
+
+  private _applyDisableSmoothCSS = (): void => {
+    if (this._disableSmooth) {
+      this._disableSmoothSheet.innerText =
+        '#crysmonitor-monitors-root .crysmonitor-slider { transition: none !important; }';
+    } else {
+      this._disableSmoothSheet.innerText = '';
+    }
+  };
+
+  setNumbersOnly = (value: boolean): void => {
+    this._numbersOnly = value;
+    this._applyNumbersOnlyCSS();
+  };
+
+  private _applyNumbersOnlyCSS = (): void => {
+    if (this._numbersOnly) {
+      this._numbersOnlySheet.innerText =
+        '#crysmonitor-monitors-root .crysmonitor-slider { display: none !important; }' +
+        '#crysmonitor-monitors-root .crysmonitor-content { background-color: transparent !important; }';
+    } else {
+      this._numbersOnlySheet.innerText = '';
+    }
   };
 
   createMonitor = (monitorSettings?: TMonitorSettings): HTMLDivElement => {

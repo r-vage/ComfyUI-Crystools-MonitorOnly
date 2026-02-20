@@ -20,6 +20,10 @@ class CrysMonitorMonitor {
     monitorGPUSettings = [];
     monitorVRAMSettings = [];
     monitorTemperatureSettings = [];
+    settingsDisableSmooth = null;
+    settingsNumbersOnly = null;
+    disableSmoothId = 'CrysMonitor.DisableSmooth';
+    numbersOnlyId = 'CrysMonitor.NumbersOnly';
     monitorUI = null;
     monitorWidthId = 'CrysMonitor.MonitorWidth';
     monitorWidth = 60;
@@ -185,6 +189,46 @@ class CrysMonitorMonitor {
             },
         };
     };
+    createSettingsDisableSmooth = () => {
+        this.settingsDisableSmooth = {
+            id: this.disableSmoothId,
+            name: 'Disable Smooth Animation',
+            category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'refresh-smooth'],
+            tooltip: 'When enabled, bars update instantly without smooth transitions',
+            type: 'boolean',
+            label: '',
+            symbol: '',
+            defaultValue: false,
+            htmlMonitorRef: undefined,
+            htmlMonitorSliderRef: undefined,
+            htmlMonitorLabelRef: undefined,
+            cssColor: '',
+            // @ts-ignore
+            onChange: (value) => {
+                this.monitorUI?.setDisableSmooth(value);
+            },
+        };
+    };
+    createSettingsNumbersOnly = () => {
+        this.settingsNumbersOnly = {
+            id: this.numbersOnlyId,
+            name: 'Show Numbers Only',
+            category: ['CrysMonitor', this.menuPrefix + ' Configuration', 'refresh-text'],
+            tooltip: 'When enabled, hides the colored bar and shows only the numeric value',
+            type: 'boolean',
+            label: '',
+            symbol: '',
+            defaultValue: false,
+            htmlMonitorRef: undefined,
+            htmlMonitorSliderRef: undefined,
+            htmlMonitorLabelRef: undefined,
+            cssColor: '',
+            // @ts-ignore
+            onChange: (value) => {
+                this.monitorUI?.setNumbersOnly(value);
+            },
+        };
+    };
     createSettingsCPU = () => {
         // CPU Variables
         this.monitorCPUElement = {
@@ -194,7 +238,7 @@ class CrysMonitorMonitor {
             type: 'boolean',
             label: 'CPU',
             symbol: '%',
-            defaultValue: false,
+            defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
             htmlMonitorLabelRef: undefined,
@@ -240,7 +284,7 @@ class CrysMonitorMonitor {
             label: 'GPU',
             symbol: '%',
             monitorTitle: `0: ${name}`,
-            defaultValue: false,
+            defaultValue: true,
             htmlMonitorRef: undefined,
             htmlMonitorSliderRef: undefined,
             htmlMonitorLabelRef: undefined,
@@ -350,6 +394,8 @@ class CrysMonitorMonitor {
     };
     createSettings = () => {
         app.ui.settings.addSetting(this.settingsRate);
+        app.ui.settings.addSetting(this.settingsDisableSmooth);
+        app.ui.settings.addSetting(this.settingsNumbersOnly);
         app.ui.settings.addSetting(this.settingsMonitorHeight);
         app.ui.settings.addSetting(this.settingsMonitorHeightLegacy);
         app.ui.settings.addSetting(this.settingsMonitorWidth);
@@ -514,6 +560,8 @@ class CrysMonitorMonitor {
         this.createSettingsMonitorHeight();
         this.createSettingsMonitorHeightLegacy();
         this.createSettingsMonitorWidth();
+        this.createSettingsDisableSmooth();
+        this.createSettingsNumbersOnly();
         this.createSettingsCPU();
         this.createSettingsRAM();
         this.createSettingsHDD();
@@ -526,7 +574,9 @@ class CrysMonitorMonitor {
         this.crysmonitorButtonGroup = document.createElement('div');
         this.crysmonitorButtonGroup.id = 'crysmonitor-monitors-root';
         app.menu?.settingsGroup.element.before(this.crysmonitorButtonGroup);
-        this.monitorUI = new MonitorUI(this.crysmonitorButtonGroup, this.monitorCPUElement, this.monitorRAMElement, this.monitorHDDElement, this.monitorGPUSettings, this.monitorVRAMSettings, this.monitorTemperatureSettings, currentRate);
+        const disableSmooth = !!app.extensionManager.setting.get(this.disableSmoothId);
+        const numbersOnly = !!app.extensionManager.setting.get(this.numbersOnlyId);
+        this.monitorUI = new MonitorUI(this.crysmonitorButtonGroup, this.monitorCPUElement, this.monitorRAMElement, this.monitorHDDElement, this.monitorGPUSettings, this.monitorVRAMSettings, this.monitorTemperatureSettings, currentRate, disableSmooth, numbersOnly);
         this.updateDisplay(this.menuDisplayOption);
     };
 }
@@ -536,4 +586,3 @@ app.registerExtension({
     init: crysmonitorMonitor.init,
     setup: crysmonitorMonitor.setup,
 });
-//# sourceMappingURL=monitor.js.map
