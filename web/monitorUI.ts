@@ -93,11 +93,12 @@ export class MonitorUI extends ProgressBarUIBase {
     this._rafId = 0;
     const data = this._pendingData;
     if (!data) return;
-    this._pendingData = null;
 
-    // Skip all DOM writes when the tab is not visible
+    // Skip all DOM writes when the tab is not visible — keep data so the
+    // next rAF after the tab becomes visible will use the latest snapshot.
     if (document.hidden) return;
 
+    this._pendingData = null;
     this._doUpdateDisplay(data);
   };
 
@@ -221,6 +222,7 @@ export class MonitorUI extends ProgressBarUIBase {
   };
 
   updateAllAnimationDuration = (value: number): void => {
+    this.currentRate = value;
     this.updatedAnimationDuration(this.monitorCPUElement, value);
     this.updatedAnimationDuration(this.monitorRAMElement, value);
     this.updatedAnimationDuration(this.monitorHDDElement, value);
@@ -266,8 +268,34 @@ export class MonitorUI extends ProgressBarUIBase {
   };
 
   setNumbersOnly = (value: boolean): void => {
+    const wasNumbersOnly = this._numbersOnly;
     this._numbersOnly = value;
     this._applyNumbersOnlyCSS();
+
+    // When switching from numbers-only back to bars, invalidate cached values
+    // so the next updateMonitor() call writes fresh slider transforms.
+    if (wasNumbersOnly && !value) {
+      this._invalidateMonitorCaches();
+    }
+  };
+
+  private _invalidateMonitorCaches = (): void => {
+    const allSettings = [
+      this.monitorCPUElement,
+      this.monitorRAMElement,
+      this.monitorHDDElement,
+      ...this.monitorGPUSettings,
+      ...this.monitorVRAMSettings,
+      ...this.monitorTemperatureSettings,
+    ];
+    for (const s of allSettings) {
+      if (s) {
+        s._lastPercent = undefined;
+        s._lastUsed = undefined;
+        s._lastTotal = undefined;
+        s._lastTempColor = undefined;
+      }
+    }
   };
 
   private _applyNumbersOnlyCSS = (): void => {
